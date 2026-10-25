@@ -5,19 +5,15 @@
 # the pages to drift out of date. Edit the pages in the app repo.
 #
 # The app repo is PRIVATE, so this repo's own GITHUB_TOKEN cannot check it out. The checkout uses a
-# fine-grained personal access token instead, stored here as the `HOMEY_APP_READ_TOKEN` secret:
+# read-only deploy key on the app repo instead, stored here as the `HOMEY_APP_DEPLOY_KEY` secret:
 #
-#   1. GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens →
-#      Generate new token. Resource owner: mega-yfue. Repository access: Only select repositories →
-#      homey-eufy-app. Permissions: Contents → Read-only (Metadata → Read-only is added with it).
-#      Nothing else.
-#   2. If the organization requires approval for fine-grained tokens, approve it under
-#      Organization → Settings → Personal access tokens → Pending requests.
-#   3. This repo → Settings → Secrets and variables → Actions → New repository secret
-#      `HOMEY_APP_READ_TOKEN`: paste the token.
+#   1. `ssh-keygen -t ed25519 -N "" -C homey-eufy-docs -f homey-eufy-docs-key`
+#   2. App repo → Settings → Deploy keys → Add: paste `homey-eufy-docs-key.pub`, leave
+#      "Allow write access" OFF.
+#   3. This repo → Settings → Secrets and variables → Actions → New secret
+#      `HOMEY_APP_DEPLOY_KEY`: paste `homey-eufy-docs-key` (the private half). Delete both files.
 #
-# The token reaches that one repo only and can only read it. It expires on the date picked when it
-# was made; the nightly build fails on the day it does, and a new token in the same secret fixes it.
+# A deploy key reaches that one repo only, read-only, and does not expire.
 #
 # What gets published: the app repo's `site/` VitePress build. `site/migration.md` includes
 # `../docs/migration.md`, which is why the whole app repo is checked out rather than `site/` alone.
@@ -65,7 +61,7 @@ jobs:
         with:
           repository: mega-yfue/homey-eufy-app
           ref: main
-          token: ${{ secrets.HOMEY_APP_READ_TOKEN }}
+          ssh-key: ${{ secrets.HOMEY_APP_DEPLOY_KEY }}
           persist-credentials: false
 
       - name: Set up Node.js

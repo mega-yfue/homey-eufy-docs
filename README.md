@@ -10,6 +10,6 @@ The site rebuilds nightly and on demand — Actions → `pages` → *Run workflo
 
 ## Setup
 
-The app repo is private, so the workflow checks it out with a read-only fine-grained access token. The steps are at
+The app repo is private, so the workflow checks it out with a read-only deploy key. The steps are at
 the top of [`pages.yml`](.github/workflows/pages.yml). Pages must be enabled with **GitHub Actions**
 as its source: Settings → Pages → Build and deployment → Source.
