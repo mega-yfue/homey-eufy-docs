@@ -1,0 +1,98 @@
+# Build the Anker Eufy for Homey help site and publish it at https://mega-yfue.github.io/homey-eufy-docs/
+#
+# This repo holds NO documentation content — only this workflow. The site is generated entirely from
+# the app repo's `site/` folder on every run, so there is nothing here to keep in sync and no copy of
+# the pages to drift out of date. Edit the pages in the app repo.
+#
+# The app repo is PRIVATE, so this repo's own GITHUB_TOKEN cannot check it out. The checkout uses a
+# read-only deploy key on the app repo instead, stored here as the `HOMEY_APP_DEPLOY_KEY` secret:
+#
+#   1. `ssh-keygen -t ed25519 -N "" -C homey-eufy-docs -f homey-eufy-docs-key`
+#   2. App repo → Settings → Deploy keys → Add: paste `homey-eufy-docs-key.pub`, leave
+#      "Allow write access" OFF.
+#   3. This repo → Settings → Secrets and variables → Actions → New secret
+#      `HOMEY_APP_DEPLOY_KEY`: paste `homey-eufy-docs-key` (the private half). Delete both files.
+#
+# A deploy key reaches that one repo only, read-only, and does not expire.
+#
+# What gets published: the app repo's `site/` VitePress build. `site/migration.md` includes
+# `../docs/migration.md`, which is why the whole app repo is checked out rather than `site/` alone.
+# Nothing else from the private repo is copied into the published output.
+#
+# The site base is `/homey-eufy-docs/`: GitHub Pages serves a project repo under `/<repo>/`, and the
+# site's VitePress config reads `SITE_BASE` for anything other than its default.
+#
+# ── Why there is no `pull_request` trigger ──────────────────────────────────────────────────────
+# Every page comes from another repository, so a pull request here has no content to validate — and
+# the job carries `pages: write`, which publishes the live site. The app repo's own `site` workflow
+# builds the site on its pull requests.
+#
+# ── Actions are pinned to full-length commit SHAs ───────────────────────────────────────────────
+# A tag is mutable; a SHA is not, so an update is a reviewable diff. The trailing `# vX.Y.Z` is the
+# human-readable version, which Dependabot rewrites alongside the SHA (see dependabot.yml).
+name: pages
+
+on:
+  push:
+    branches: [main]
+  # The app repo cannot notify this one without a cross-repo token, so the site refreshes nightly
+  # and on demand. Use "Run workflow" for an immediate publish after a docs change.
+  schedule:
+    - cron: "17 5 * * *"
+  workflow_dispatch:
+
+# Least privilege plus the tokens the Pages deploy needs.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One Pages deploy at a time; never cancel an in-flight publish.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the app repo (source of the site)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: mega-yfue/homey-eufy-app
+          ref: main
+          ssh-key: ${{ secrets.HOMEY_APP_DEPLOY_KEY }}
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: site/package-lock.json
+
+      - name: Install site dependencies
+        working-directory: site
+        run: npm ci
+
+      - name: Build the site
+        working-directory: site
+        env:
+          SITE_BASE: /homey-eufy-docs/
+        run: npm run build
+
+      - name: Upload the Pages artifact
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: site/.vitepress/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
