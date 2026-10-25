@@ -15,6 +15,10 @@
 #
 # A deploy key reaches that one repo only, read-only, and does not expire.
 #
+# The Supported devices page is copied from the public eufy SDK's device gallery during the build
+# (the app repo's `site/scripts/sync-devices.mjs`), so the SDK is checked out too — only the
+# gallery's three paths, with this repo's own GITHUB_TOKEN. The nightly run picks up SDK changes.
+#
 # What gets published: the app repo's `site/` VitePress build. `site/migration.md` includes
 # `../docs/migration.md`, which is why the whole app repo is checked out rather than `site/` alone.
 # Nothing else from the private repo is copied into the published output.
@@ -64,6 +68,19 @@ jobs:
           ssh-key: ${{ secrets.HOMEY_APP_DEPLOY_KEY }}
           persist-credentials: false
 
+      - name: Check out the eufy SDK's device gallery
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: mega-yfue/eufy-sdk
+          ref: main
+          path: _eufy-sdk
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            docs/devices-gallery.md
+            docs/device-icons
+            docs/public/devices
+
       - name: Set up Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
@@ -79,6 +96,7 @@ jobs:
         working-directory: site
         env:
           SITE_BASE: /homey-eufy-docs/
+          EUFY_SDK_DIR: ${{ github.workspace }}/_eufy-sdk
         run: npm run build
 
       - name: Upload the Pages artifact
